@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Treasure Hunt - 연결리스트 보물찾기</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  background: #f4f6fb;
+  color: #172033;
+}
+header {
+  background: linear-gradient(135deg, #253b80, #536dfe);
+  color: white;
+  padding: 22px 24px;
+  box-shadow: 0 3px 12px rgba(0,0,0,.15);
+}
+header h1 { margin: 0 0 6px; font-size: 28px; }
+header p { margin: 0; opacity: .9; }
+.container {
+  max-width: 1250px;
+  margin: 20px auto;
+  padding: 0 16px;
+}
+.topbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.panel {
+  background: white;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 3px 14px rgba(20,30,60,.08);
+}
+.stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.stat {
+  min-width: 120px;
+  background: #f0f3ff;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.stat b { display:block; font-size: 19px; margin-top: 3px; }
+.controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+button, select {
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+button { background:#536dfe; color:white; font-weight:700; }
+button:hover { filter: brightness(.95); }
+button.secondary { background:#e8ebf7; color:#25304d; }
+.game {
+  display: grid;
+  grid-template-columns: minmax(480px, 1fr) 330px;
+  gap: 16px;
+}
+.grid-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+.grid {
+  position: relative;
+  z-index: 1;
+  display:grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 5px;
+  width: 100%;
+  height: 100%;
+}
+.arrow-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: visible;
+}
+.grid .cell {
+  position: relative;
+  z-index: 1;
+}
+.cell {
+  position:relative;
+  border: 1px solid #cfd5e5;
+  background:#eef1f7;
+  border-radius:6px;
+  color:#65708b;
+  font-weight:700;
+  font-size: clamp(10px, 1.25vw, 15px);
+  padding:0;
+  transition:.15s;
+}
+.cell:hover:not(:disabled) { background:#dfe5ff; transform:scale(1.02); }
+.cell:disabled { cursor: default; }
+.cell.opened { background:#fff; border-color:#9ca8c3; color:#293653; }
+.cell.current { outline:3px solid #536dfe; background:#e9edff; }
+.cell.path { background:#e8f7ef; border-color:#58ad7b; color:#237047; }
+.cell.wrong { animation: shake .25s; background:#ffe7e7; border-color:#e57b7b; }
+.cell.treasure { background:#fff4c7; border-color:#e2b83f; color:#8b6400; }
+.cell .badge {
+  position:absolute;
+  top:3px; right:3px;
+  font-size:10px;
+  background: rgba(255,255,255,.92);
+  padding: 1px 3px;
+  border-radius: 3px;
+  z-index: 4;
+}
+@keyframes shake {
+  0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)}
+}
+.info h2 { margin-top:0; font-size:20px; }
+.memory-card {
+  border:1px solid #dce1ed;
+  border-radius:12px;
+  padding:14px;
+  background:#fafbfe;
+  margin-bottom:12px;
+}
+.memory-card .addr { color:#536dfe; font-weight:800; }
+.memory-row { display:flex; justify-content:space-between; margin:9px 0; }
+.next-value {
+  font-weight:800;
+  color:#1e7a4b;
+}
+.log {
+  max-height: 250px;
+  overflow:auto;
+  background:#101522;
+  color:#dce6ff;
+  border-radius:10px;
+  padding:10px;
+  font-family:Consolas, monospace;
+  font-size:12px;
+}
+.log div { padding:4px 0; border-bottom:1px solid #263049; }
+.message {
+  border-radius:10px;
+  padding:12px;
+  background:#f0f3ff;
+  margin-bottom:12px;
+  line-height:1.5;
+}
+.message.success { background:#e7f8ee; color:#17643c; }
+.message.error { background:#fff0f0; color:#9a2525; }
+.legend { font-size:12px; color:#69748b; margin-top:10px; }
+.modal {
+  display:none;
+  position:fixed; inset:0;
+  background:rgba(10,18,40,.68);
+  align-items:center; justify-content:center;
+  z-index:10;
+}
+.modal.show { display:flex; }
+.modal-box {
+  width:min(520px, calc(100% - 30px));
+  background:white;
+  border-radius:18px;
+  padding:28px;
+  text-align:center;
+  box-shadow:0 15px 50px rgba(0,0,0,.3);
+}
+.treasure { font-size:64px; margin:4px; }
+.modal-box h2 { font-size:28px; margin:8px 0; }
+.modal-box p { color:#5e687d; line-height:1.6; }
+.score { font-size:22px; font-weight:800; color:#536dfe; }
+@media (max-width: 900px) {
+  .game { grid-template-columns:1fr; }
+  .topbar { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>💎 Memory Treasure Hunt</h1>
+  <p>10×10 메모리 공간에서 NEXT 주소를 따라 연결 리스트의 보물을 찾아보세요!</p>
+</header>
+
+<div class="container">
+  <div class="topbar">
+    <div class="panel">
+      <div class="stats">
+        <div class="stat">현재 주소<b id="current">START</b></div>
+        <div class="stat">이동 횟수<b id="moves">0</b></div>
+        <div class="stat">실수 횟수<b id="mistakes">0</b></div>
+        <div class="stat">남은 기회<b id="lives">1</b></div>
+      </div>
+    </div>
+    <div class="panel controls">
+      <label for="difficulty">난이도</label>
+      <select id="difficulty">
+        <option value="easy">🟢 EASY</option>
+        <option value="normal" selected>🟡 NORMAL</option>
+        <option value="hard">🔴 HARD</option>
+      </select>
+      <button id="newGame">새 게임</button>
+      <button class="secondary" id="showHint">힌트</button>
+    </div>
+  </div>
+
+  <div class="game">
+    <div class="panel">
+      <div id="message" class="message">
+        <b>게임 시작!</b><br>
+        START 노드부터 연결 리스트를 따라가 보세요.
+      </div>
+      <div class="grid-wrap">
+        <div id="grid" class="grid"></div>
+        <svg id="arrowLayer" class="arrow-layer" aria-hidden="true"></svg>
+      </div>
+      <div class="legend">
+        💡 모든 칸은 하나의 메모리 공간입니다. 번호가 이웃해 있어도 연결되어 있다는 뜻은 아닙니다.
+      </div>
+    </div>
+
+    <aside class="panel info">
+      <h2>🔎 현재 메모리</h2>
+      <div id="memoryCard" class="memory-card">
+        아직 메모리를 열지 않았습니다.
+      </div>
+
+      <h2>📜 탐색 기록</h2>
+      <div id="log" class="log">
+        <div>START에서 출발합니다.</div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <b>🎯 목표</b>
+        <p style="font-size:13px;line-height:1.6;color:#65708b;">
+          현재 노드의 <b>NEXT</b>가 가리키는 메모리 공간을 찾아
+          마지막 노드의 💎 보물을 발견하세요.
+        </p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div id="modal" class="modal">
+  <div class="modal-box">
+    <div class="treasure">💎</div>
+    <h2>보물 발견!</h2>
+    <p id="resultText"></p>
+    <div class="score" id="score"></div>
+    <br>
+    <button id="again">다시 도전하기</button>
+  </div>
+</div>
+
+<script>
+const SIZE = 100;
+let memory = [];
+let startAddress = null;
+let currentAddress = null;
+let path = [];
+let moves = 0;
+let mistakes = 0;
+let lives = 8;
+let gameOver = false;
+let difficulty = "normal";
+
+const grid = document.getElementById("grid");
+const message = document.getElementById("message");
+const memoryCard = document.getElementById("memoryCard");
+const log = document.getElementById("log");
+
+function shuffled(arr) {
+  return [...arr].sort(() => Math.random() - 0.5);
+}
+
+function buildLinkedList() {
+  memory = Array.from({length: SIZE}, (_, i) => ({
+    address: i,
+    data: Math.floor(Math.random() * 900) + 100,
+    next: null,
+    opened: false,
+    treasure: false
+  }));
+
+  // 주소들이 서로 인접하지 않도록 가능한 한 섞어서 선택
+  let addresses = shuffled(Array.from({length: SIZE}, (_, i) => i));
+  let chain = [];
+
+  for (const a of addresses) {
+    if (chain.length === 0 || Math.abs(a - chain[chain.length - 1]) !== 1) {
+      chain.push(a);
+    }
+    if (chain.length >= 10) break;
+  }
+
+  // 충분한 길이를 보장
+  if (chain.length < 10) {
+    const remaining = shuffled(
+      Array.from({length: SIZE}, (_, i) => i).filter(x => !chain.includes(x))
+    );
+    chain = chain.concat(remaining).slice(0, 10);
+  }
+
+  for (let i = 0; i < chain.length - 1; i++) {
+    memory[chain[i]].next = chain[i + 1];
+  }
+  memory[chain.at(-1)].next = null;
+  memory[chain.at(-1)].treasure = true;
+
+  startAddress = chain[0];
+  currentAddress = null;
+  path = [];
+}
+
+function createGrid() {
+  grid.innerHTML = "";
+  for (let i = 0; i < SIZE; i++) {
+    const btn = document.createElement("button");
+    btn.className = "cell";
+    btn.dataset.address = i;
+    btn.textContent = String(i).padStart(2, "0");
+    btn.addEventListener("click", () => clickMemory(i));
+    grid.appendChild(btn);
+  }
+  updateGrid();
+}
+
+function updateGrid() {
+  [...grid.children].forEach(btn => {
+    const a = Number(btn.dataset.address);
+    const node = memory[a];
+    btn.className = "cell";
+    btn.disabled = false;
+
+    if (node.opened) btn.classList.add("opened");
+    if (path.includes(a)) btn.classList.add("path");
+    if (a === currentAddress) btn.classList.add("current");
+    if (node.treasure && node.opened) {
+      btn.classList.add("treasure");
+      btn.innerHTML = "💎";
+    } else {
+      btn.textContent = String(a).padStart(2,"0");
+    }
+
+    if (gameOver) btn.disabled = true;
+  });
+}
+
+
+function drawArrows() {
+  const svg = document.getElementById("arrowLayer");
+  if (!svg) return;
+
+  const wrap = document.querySelector(".grid-wrap");
+  if (!wrap) return;
+
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.innerHTML = `
+    <defs>
+      <marker id="arrowHead" markerWidth="7" markerHeight="7"
+              refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L7,3.5 L0,7 Z" fill="#536dfe"></path>
+      </marker>
+    </defs>
+  `;
+
+  // 실제로 찾아낸 연결만 화살표로 표시합니다.
+  for (let i = 0; i < path.length - 1; i++) {
+    const from = path[i];
+    const to = path[i + 1];
+
+    const fromBtn = grid.children[from];
+    const toBtn = grid.children[to];
+    if (!fromBtn || !toBtn) continue;
+
+    const a = fromBtn.getBoundingClientRect();
+    const b = toBtn.getBoundingClientRect();
+    const r = wrap.getBoundingClientRect();
+
+    const x1 = a.left + a.width / 2 - r.left;
+    const y1 = a.top + a.height / 2 - r.top;
+    const x2 = b.left + b.width / 2 - r.left;
+    const y2 = b.top + b.height / 2 - r.top;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+
+    // 화살표가 메모리 주소를 가리지 않도록 셀 가장자리에서 시작/종료
+    const offset = Math.min(Math.min(a.width, a.height) * 0.32, len * 0.35);
+    const sx = x1 + dx / len * offset;
+    const sy = y1 + dy / len * offset;
+    const ex = x2 - dx / len * offset;
+    const ey = y2 - dy / len * offset;
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", sx);
+    line.setAttribute("y1", sy);
+    line.setAttribute("x2", ex);
+    line.setAttribute("y2", ey);
+    line.setAttribute("stroke", "#536dfe");
+    line.setAttribute("stroke-width", "3");
+    line.setAttribute("stroke-linecap", "round");
+    line.setAttribute("marker-end", "url(#arrowHead)");
+    line.setAttribute("opacity", "0.92");
+    svg.appendChild(line);
+  }
+}
+
+function startGame() {
+  difficulty = document.getElementById("difficulty").value;
+  lives = 1;
+  moves = 0;
+  mistakes = 0;
+  gameOver = false;
+
+  buildLinkedList();
+  createGrid();
+  updateStats();
+
+  message.className = "message";
+  message.innerHTML = `<b>START = ${String(startAddress).padStart(2,"0")}</b><br>
+  시작 메모리를 열어 연결 리스트 탐색을 시작하세요.`;
+
+  memoryCard.innerHTML = `
+    <div style="font-size:13px;color:#69748b;">
+      START 주소: <b>${String(startAddress).padStart(2,"0")}</b>
+    </div>
+    <p style="font-size:13px;line-height:1.5;">
+      START 메모리를 클릭하면 DATA와 NEXT를 확인할 수 있습니다.
+    </p>`;
+  log.innerHTML = `<div>🚩 START = ${String(startAddress).padStart(2,"0")}</div>`;
+}
+
+function clickMemory(address) {
+  if (gameOver) return;
+
+  const node = memory[address];
+
+  // 첫 클릭은 START만 허용
+  if (currentAddress === null) {
+    if (address !== startAddress) {
+      wrongClick(address, `START는 ${String(startAddress).padStart(2,"0")}번입니다.`);
+      return;
+    }
+    openNode(address);
+    return;
+  }
+
+  // 현재 노드의 NEXT와 비교
+  const expected = memory[currentAddress].next;
+
+  if (address !== expected) {
+    wrongClick(address, `현재 NEXT는 ${String(expected).padStart(2,"0")}입니다.`);
+    return;
+  }
+
+  openNode(address);
+}
+
+function openNode(address) {
+  const node = memory[address];
+  node.opened = true;
+  currentAddress = address;
+  path.push(address);
+  moves++;
+
+  memoryCard.innerHTML = `
+    <div class="addr">MEMORY : ${String(node.address).padStart(2,"0")}</div>
+    <div class="memory-row"><span>DATA</span><strong>${node.data}</strong></div>
+    <div class="memory-row" style="font-size:18px;">
+      <span><b>NEXT</b></span>
+      <span class="next-value">${node.next === null ? "NULL" : String(node.next).padStart(2,"0")}</span>
+    </div>
+    ${node.treasure ? '<div style="margin-top:12px;text-align:center;font-size:28px;">💎 TREASURE!</div>' : ''}
+  `;
+
+  log.innerHTML += `<div>📦 ${String(node.address).padStart(2,"0")} → ${
+    node.next === null ? "NULL 💎" : String(node.next).padStart(2,"0")
+  }</div>`;
+  log.scrollTop = log.scrollHeight;
+
+  if (node.treasure) {
+    winGame();
+  } else {
+    // 다음 주소를 직접 안내하지 않고,
+    // 오른쪽 메모리 카드에 표시된 NEXT 값을 학생이 읽도록 합니다.
+    message.className = "message";
+    message.innerHTML = `<b>메모리 공간을 열었습니다.</b><br>
+    메모리 카드에서 <b>NEXT</b> 주소를 확인하세요.`;
+  }
+
+  updateStats();
+  updateGrid();
+  drawArrows();
+}
+
+function wrongClick(address, reason) {
+  mistakes++;
+  lives--;
+
+  const btn = grid.children[address];
+  btn.classList.add("wrong");
+  setTimeout(() => btn.classList.remove("wrong"), 300);
+
+  message.className = "message error";
+  message.innerHTML = `❌ <b>잘못된 선택!</b><br>${reason}<br>
+  <small>현재 노드의 NEXT를 다시 확인해 보세요.</small>`;
+
+  log.innerHTML += `<div>❌ ${String(address).padStart(2,"0")} 선택 — ${reason}</div>`;
+  log.scrollTop = log.scrollHeight;
+
+  updateStats();
+
+  if (lives <= 0) {
+    loseGame();
+  }
+}
+
+function updateStats() {
+  document.getElementById("current").textContent =
+    currentAddress === null ? "START" : String(currentAddress).padStart(2,"0");
+  document.getElementById("moves").textContent = moves;
+  document.getElementById("mistakes").textContent = mistakes;
+  document.getElementById("lives").textContent = lives;
+}
+
+function winGame() {
+  gameOver = true;
+  const score = Math.max(100, 1000 - mistakes * 100 - Math.max(0, moves - 7) * 20);
+  document.getElementById("resultText").innerHTML =
+    `연결 리스트의 마지막 노드까지 정확하게 탐색했습니다.<br>
+     탐색 경로: <b>${path.map(x => String(x).padStart(2,"0")).join(" → ")}</b><br>
+     총 이동 ${moves}회 · 실수 ${mistakes}회`;
+  document.getElementById("score").textContent = `점수 ${score}점`;
+  document.getElementById("modal").classList.add("show");
+  message.className = "message success";
+  message.innerHTML = `🎉 <b>보물을 찾았습니다!</b> 연결 리스트 탐색 성공!`;
+  updateGrid();
+  drawArrows();
+}
+
+function loseGame() {
+  gameOver = true;
+  document.getElementById("resultText").innerHTML =
+    `기회를 모두 사용했습니다.<br>
+     마지막으로 확인한 노드: <b>${currentAddress === null ? "START" : currentAddress}</b>`;
+  document.getElementById("score").textContent = "다시 NEXT를 따라가 보세요!";
+  document.getElementById("modal").classList.add("show");
+  message.className = "message error";
+  message.innerHTML = `😢 기회를 모두 사용했습니다. 새 게임에서 다시 도전해 보세요.`;
+  updateGrid();
+  drawArrows();
+}
+
+function hint() {
+  if (gameOver) return;
+
+  let target;
+  if (currentAddress === null) target = startAddress;
+  else target = memory[currentAddress].next;
+
+  const btn = grid.children[target];
+  btn.style.boxShadow = "0 0 0 4px #ffd54f";
+  setTimeout(() => btn.style.boxShadow = "", 1200);
+
+  message.className = "message";
+  message.innerHTML = `💡 힌트: <b>${String(target).padStart(2,"0")}</b>번 메모리를 확인해 보세요.`;
+}
+
+document.getElementById("newGame").addEventListener("click", startGame);
+document.getElementById("again").addEventListener("click", () => {
+  document.getElementById("modal").classList.remove("show");
+  startGame();
+});
+document.getElementById("showHint").addEventListener("click", hint);
+document.getElementById("difficulty").addEventListener("change", startGame);
+
+startGame();
+window.addEventListener("resize", drawArrows);
+</script>
+</body>
+</html>
